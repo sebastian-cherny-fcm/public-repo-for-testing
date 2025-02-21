@@ -1,0 +1,109 @@
+// Context management
+let currentContext = {
+    url: window.parent.location.href,
+    cityOrigin: "",
+    cityDestination: "",
+    timestamp: new Date()
+};
+
+// Selectors for Trivago inputs
+const SELECTORS = {
+    destination: "[data-testid=search-form-destination]",
+    origin: "[data-testid=search-form-origin]"  // Adjust this selector as needed
+};
+
+// Function to update context and notify backend
+async function updateContext(updates, this_document_var) {
+    const previousContext = { ...currentContext };
+    currentContext = {
+        ...currentContext,
+        ...updates,
+        timestamp: new Date()
+    };
+
+    // Only notify backend if there are actual changes
+    if (JSON.stringify(previousContext) !== JSON.stringify(currentContext)) {
+        try {
+            const response = await fetch('http://localhost:3000/api/update-context', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(currentContext)
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.notificationIframe) {
+                    // Handle notification update
+                    updateNotification(data.notificationIframe, this_document_var);
+                }
+            }
+        } catch (error) {
+            console.error('Error updating context:', error);
+        }
+    }
+}
+
+// Function to update the notification content
+function updateNotification(notification, this_document_var) {
+    console.log(notification);
+    console.log(this_document_var);
+    if (!notification) return;
+
+    const container = this_document_var.createElement('div');
+    container.className = 'windsurf-notification';
+    container.innerHTML = notification;
+    container.style.cssText = `
+                                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+                                background-color: white;
+                                border-radius: 8px;
+                                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                                padding: 16px;
+                                margin: 0;
+                                max-width: 100%;
+                                box-sizing: border-box;
+                                position: fixed;
+                                bottom: 20px;
+                                right: 20px;
+                                width: 300px;
+                                height: 200px;
+                                border: none;
+                                z-index: 2147483647;
+                                `;
+
+    // Clear previous notification if exists
+    const existingNotification = this_document_var.querySelector('.windsurf-notification');
+    if (existingNotification) {
+        existingNotification.remove();
+    }
+
+    this_document_var.body.appendChild(container);
+}
+
+// Main function to initialize context monitoring
+function mainFunction() {
+    // Set up observers for input changes
+    const observeInput = (selector, contextKey) => {
+        setInterval(() => {
+            const element = window.parent.document.querySelector(selector);
+            console.log(element);
+            if (element) {
+                const value = element.value || "";
+                if (currentContext[contextKey] !== value) {
+                    updateContext({ [contextKey]: value }, document);
+                }
+            }
+        }, 1000); // Check every second
+    };
+
+    // Start observing inputs
+    observeInput(SELECTORS.destination, 'cityDestination');
+    observeInput(SELECTORS.origin, 'cityOrigin');
+
+    // Initial context update
+    updateContext({}, window.parent.document);
+}
+
+// Initialize when the script loads
+mainFunction();
